@@ -1,7 +1,7 @@
 import sqlite3
 
 query = """
-    select ili,wikidata,group_concat(source),avg(score) 
+    select ili,wikidata,group_concat(source),count(*),avg(score) 
     from (
        select ili,wikidata,1 as source,NULL as score from john_wikidata where ili is not NULL
        UNION
@@ -21,13 +21,21 @@ query = """
     """
 
 with sqlite3.connect("wordnet_wikidata_mapping.db") as con:
-    cur = con.cursor()
-    dataset = (set(),set())
-    for fields in cur.execute(query):
-        if fields[0] in dataset[0]:
-            continue
-        dataset[0].add(fields[0])
-        if fields[1] in dataset[1]:
-            continue
-        dataset[1].add(fields[1])
-        print(fields)
+    with open("union.txt","w") as u, open("discarded.txt","w") as d:
+        cur = con.cursor()
+        dataset = ({},{})
+        ambiguities = 0
+        for fields in cur.execute(query):
+            c = int(fields[3])
+            if dataset[0].get(fields[0],0) > c:
+                d.write(str(fields)+"\n")
+            elif dataset[0].get(fields[0],0) == c:
+                ambiguities += 1
+            dataset[0][fields[0]] = c
+            if dataset[1].get(fields[1],0) > c:
+                d.write(str(fields)+"\n")
+            elif dataset[1].get(fields[1],0) == c:
+                ambiguities += 1
+            dataset[1][fields[1]] = c
+            u.write(str(fields)+"\n")
+        print(ambiguities)
